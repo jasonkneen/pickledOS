@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { MOCK_INTEGRATIONS, generateMemories } from './constants';
+import { generateMemoriesWithEmbeddings } from './services/semantic-linking';
 import { Memory, Integration } from './types';
 import BubbleGraph from './components/BubbleGraph';
 import IntegrationsModal from './components/IntegrationsModal';
 import MemorySidebar from './components/MemorySidebar';
 import ChatPanel from './components/ChatPanel';
 import SettingsPanel, { VisualSettings, DEFAULT_SETTINGS } from './components/SettingsPanel';
+import { StatusIndicator } from './components/StatusIndicator';
 import { Settings, Plus, LayoutGrid, Disc, Target, Image as ImageIcon } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -29,27 +31,48 @@ const App: React.FC = () => {
 
   // Initial Load: Load any integration marked as connected by default in constants
   useEffect(() => {
-    const connectedServices = MOCK_INTEGRATIONS.filter(i => i.connected);
-    let initialMemories: Memory[] = [];
-    connectedServices.forEach(service => {
-        initialMemories = [...initialMemories, ...generateMemories(service.id)];
-    });
-    setMemories(initialMemories);
+    const loadInitialMemories = async () => {
+      const connectedServices = MOCK_INTEGRATIONS.filter(i => i.connected);
+      let initialMemories: Memory[] = [];
+
+      for (const service of connectedServices) {
+        try {
+          // Try LEANN integration first, fallback to mock if unavailable
+          const memories = await generateMemoriesWithEmbeddings(service.id);
+          initialMemories = [...initialMemories, ...memories];
+        } catch (err) {
+          console.warn(`LEANN unavailable for ${service.id}, using fallback`);
+          initialMemories = [...initialMemories, ...generateMemories(service.id)];
+        }
+      }
+
+      setMemories(initialMemories);
+    };
+
+    loadInitialMemories();
   }, []);
 
-  const toggleIntegration = (id: string) => {
+  const toggleIntegration = async (id: string) => {
     setIntegrations(prev => {
-        const next = prev.map(int => 
+        const next = prev.map(int =>
           int.id === id ? { ...int, connected: !int.connected } : int
         );
-        
+
         // Find the changed integration
         const changed = next.find(i => i.id === id);
         if (changed) {
             if (changed.connected) {
-                // Load memories
-                const newMemories = generateMemories(id);
-                setMemories(current => [...current, ...newMemories]);
+                // Load memories with LEANN integration
+                (async () => {
+                  try {
+                    const newMemories = await generateMemoriesWithEmbeddings(id);
+                    setMemories(current => [...current, ...newMemories]);
+                  } catch (err) {
+                    console.warn(`LEANN unavailable for ${id}, using fallback`);
+                    const newMemories = generateMemories(id);
+                    setMemories(current => [...current, ...newMemories]);
+                  }
+                })();
             } else {
                 // Unload memories
                 setMemories(current => current.filter(m => m.sourceId !== id));
@@ -59,7 +82,7 @@ const App: React.FC = () => {
                 }
             }
         }
-        
+
         return next;
     });
   };
@@ -167,10 +190,12 @@ const App: React.FC = () => {
       </div>
 
       {/* CONTROLS: Floating Bar */}
-      <div 
+      <div
         className={`fixed top-6 z-20 flex flex-col gap-3 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]`}
-        style={{ right: selectedMemory ? '520px' : '24px' }} 
+        style={{ right: selectedMemory ? '520px' : '24px' }}
       >
+         {/* Status Indicator */}
+         <StatusIndicator />
          <div className="glass-panel p-2 rounded-2xl shadow-sm flex flex-col gap-2 bg-white/90 backdrop-blur-md border border-white/50">
             <button 
                 onClick={() => setShowIntegrations(true)} 

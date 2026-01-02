@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "backend_name": "hnsw",
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "dimensions": 384,
+  "backend_kwargs": {},
+  "embedding_mode": "sentence-transformers",
+  "passage_sources": [
+    {
+      "type": "jsonl",
+      "path": "memories.leann.passages.jsonl",
+      "index_path": "memories.leann.passages.idx",
+      "path_relative": "memories.leann.passages.jsonl",
+      "index_path_relative": "memories.leann.passages.idx"
+    }
+  ],
+  "is_compact": true,
+  "is_pruned": true
+}
