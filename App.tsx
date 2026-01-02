@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MOCK_INTEGRATIONS, generateMemories } from './constants';
 import { Memory, Integration } from './types';
@@ -21,14 +22,47 @@ const App: React.FC = () => {
   // Global Drag State
   const [isDragging, setIsDragging] = useState(false);
 
+  // Initial Load: Load any integration marked as connected by default in constants
   useEffect(() => {
-    setMemories(generateMemories(50)); 
+    const connectedServices = MOCK_INTEGRATIONS.filter(i => i.connected);
+    let initialMemories: Memory[] = [];
+    connectedServices.forEach(service => {
+        initialMemories = [...initialMemories, ...generateMemories(service.id)];
+    });
+    setMemories(initialMemories);
   }, []);
 
   const toggleIntegration = (id: string) => {
-    setIntegrations(prev => prev.map(int => 
-      int.id === id ? { ...int, connected: !int.connected } : int
-    ));
+    setIntegrations(prev => {
+        const next = prev.map(int => 
+          int.id === id ? { ...int, connected: !int.connected } : int
+        );
+        
+        // Find the changed integration
+        const changed = next.find(i => i.id === id);
+        if (changed) {
+            if (changed.connected) {
+                // Load memories
+                const newMemories = generateMemories(id);
+                setMemories(current => [...current, ...newMemories]);
+            } else {
+                // Unload memories
+                setMemories(current => current.filter(m => m.sourceId !== id));
+                // If selected memory was from this source, deselect it
+                if (selectedMemory && selectedMemory.sourceId === id) {
+                    setSelectedMemory(null);
+                }
+            }
+        }
+        
+        return next;
+    });
+  };
+
+  const handleClearAll = () => {
+      setMemories([]);
+      setIntegrations(prev => prev.map(i => ({ ...i, connected: false })));
+      setSelectedMemory(null);
   };
 
   const handleAddMemory = (newMemory: Memory) => {
@@ -37,7 +71,7 @@ const App: React.FC = () => {
           .slice(0, 3) 
           .map(m => m.id);
       
-      const memoryWithLinks = { ...newMemory, relatedIds: linkedIds };
+      const memoryWithLinks = { ...newMemory, relatedIds: linkedIds, sourceId: 'upload' };
       
       setMemories(prev => [memoryWithLinks, ...prev]);
       setSelectedMemory(memoryWithLinks);
@@ -95,9 +129,24 @@ const App: React.FC = () => {
             selectedId={selectedMemory?.id || null}
             onSelectMemory={(mem) => {
                 setSelectedMemory(mem);
-                // Don't auto open chat, let user decide
             }} 
          />
+         
+         {/* Empty State / Welcome */}
+         {memories.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-white/50 backdrop-blur-md p-8 rounded-3xl text-center max-w-md pointer-events-auto shadow-xl">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Pickle</h2>
+                    <p className="text-gray-600 mb-6">Your memory graph is empty. Connect a service or drop an image to start.</p>
+                    <button 
+                        onClick={() => setShowIntegrations(true)}
+                        className="px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg"
+                    >
+                        Connect Services
+                    </button>
+                </div>
+            </div>
+         )}
          
          {/* Drag Overlay Indicator */}
          {isDragging && (
@@ -117,10 +166,13 @@ const App: React.FC = () => {
          <div className="glass-panel p-2 rounded-2xl shadow-sm flex flex-col gap-2 bg-white/90 backdrop-blur-md border border-white/50">
             <button 
                 onClick={() => setShowIntegrations(true)} 
-                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-black/5 text-gray-500 transition-colors" 
-                title="Integrations"
+                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-black/5 text-gray-500 transition-colors relative" 
+                title="Services"
             >
                 <LayoutGrid size={20} />
+                {memories.length > 0 && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full border border-white"></span>
+                )}
             </button>
             <button className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-black/5 text-gray-500 transition-colors" title="Saved">
                 <Disc size={20} />
@@ -165,6 +217,8 @@ const App: React.FC = () => {
         onClose={() => setShowIntegrations(false)}
         integrations={integrations}
         onToggle={toggleIntegration}
+        onClearAll={handleClearAll}
+        totalMemories={memories.length}
       />
 
     </div>

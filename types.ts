@@ -1,7 +1,9 @@
+
 export interface Memory {
   id: string;
   title: string;
-  source: 'gmail' | 'slack' | 'notion' | 'gpt' | 'claude' | 'apple';
+  source: string; // Changed from strict union to string to support dynamic datasets
+  sourceId?: string; // To track which dataset/integration generated this
   date: string;
   previewImage?: string;
   content: string;
@@ -18,6 +20,7 @@ export interface Integration {
   icon: string; // Emoji or URL
   description: string;
   connected: boolean;
+  type: 'app' | 'knowledge';
   stats: {
     estBubbles: string;
     firstBubbleIn: string;
