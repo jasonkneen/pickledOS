@@ -25,27 +25,27 @@ export interface VisualSettings {
 
 export const DEFAULT_SETTINGS: VisualSettings = {
   // LIGHTING
-  ambientLightIntensity: 0.10,
-  directionalLightIntensity: 0.05,
+  ambientLightIntensity: 1.45,
+  directionalLightIntensity: 1.50,
   
   // COLOR & BLOOM
-  bloomIntensity: 0.30,
-  bloomRadius: 0.10,
-  bloomThreshold: 2.00,
+  bloomIntensity: 0.40,
+  bloomRadius: 0.20,
+  bloomThreshold: 1.80,
 
-  contrast: 0.00,    
-  brightness: 0.00,
-  saturation: 0.50,
+  contrast: -0.10,    
+  brightness: -0.10,
+  saturation: 0.05,
 
   // GLASS MATERIAL
-  glassOpacity: 0.75,
-  glassRoughness: 0.25,
-  glassTransmission: 0.86,
-  glassThickness: 0.60,
+  glassOpacity: 1.00,
+  glassRoughness: 0.05,
+  glassTransmission: 0.96,
+  glassThickness: 0.50,
 
   // SCENE
-  particleOpacity: 0.10,
-  connectionOpacity: 0.10,
+  particleOpacity: 0.05,
+  connectionOpacity: 0.30,
 };
 
 interface SettingsPanelProps {
