@@ -2,6 +2,7 @@
 import React, { useMemo, useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, Float, useCursor, useTexture, AdaptiveDpr, MeshTransmissionMaterial } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { Memory } from '../types';
 
@@ -21,6 +22,60 @@ interface BubbleNodeProps {
 // Reusable geometry to reduce GPU memory overhead
 const bubbleGeometry = new THREE.SphereGeometry(1, 32, 32);
 const innerGeometry = new THREE.SphereGeometry(0.98, 32, 32);
+
+// GPU Particle System for Data Ambience
+const DataParticles = () => {
+  const count = 2000;
+  const mesh = useRef<THREE.Points>(null);
+  
+  const particles = useMemo(() => {
+    const temp = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const theta = THREE.MathUtils.randFloatSpread(360); 
+      const phi = THREE.MathUtils.randFloatSpread(360); 
+      const r = 50 + Math.random() * 100;
+      
+      const x = r * Math.sin(theta) * Math.cos(phi);
+      const y = r * Math.sin(theta) * Math.sin(phi);
+      const z = r * Math.cos(theta);
+      
+      temp[i * 3] = x;
+      temp[i * 3 + 1] = y;
+      temp[i * 3 + 2] = z;
+    }
+    return temp;
+  }, [count]);
+
+  useFrame((state, delta) => {
+     if (mesh.current) {
+         mesh.current.rotation.y += delta * 0.05;
+         mesh.current.rotation.x += delta * 0.02;
+     }
+  });
+
+  return (
+    <points ref={mesh}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={particles.length / 3}
+          array={particles}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial 
+        size={0.4} 
+        color="#93c5fd" 
+        transparent 
+        opacity={0.6} 
+        sizeAttenuation={true} 
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+};
+
 
 const BubbleContent = ({ url }: { url: string }) => {
   const texture = useTexture(url);
@@ -60,8 +115,6 @@ const Connections = ({ memories, positions }: { memories: Memory[], positions: [
 
                 mem.relatedIds.forEach(targetId => {
                     const endPos = posMap.get(targetId);
-                    // Avoid duplicating lines if possible, or just allow overlap for simplicity
-                    // Only draw if target exists
                     if (endPos) {
                         points.push(...startPos, ...endPos);
                     }
@@ -76,7 +129,7 @@ const Connections = ({ memories, positions }: { memories: Memory[], positions: [
 
     return (
         <lineSegments geometry={geometry}>
-            <lineBasicMaterial color="#94a3b8" transparent opacity={0.15} depthWrite={false} />
+            <lineBasicMaterial color="#94a3b8" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
         </lineSegments>
     );
 };
@@ -96,7 +149,8 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
       // Smooth lerp for scale interactions
       const targetScale = isSelected ? 1.6 : (hovered ? 1.3 : 1.0);
       groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), delta * 8);
-      // Subtle rotation
+      
+      // Idle animation
       groupRef.current.rotation.y += delta * 0.15;
     }
   });
@@ -121,21 +175,22 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
          <mesh geometry={bubbleGeometry}>
             <MeshTransmissionMaterial 
                 backside={false}
-                samples={4} // Lower samples for performance, sufficient for bubbles
-                resolution={512} // Texture resolution for transmission
+                samples={4} // GPU Friendly
+                resolution={512} 
                 transmission={1}
-                roughness={0.0}
+                roughness={0.05}
                 thickness={1.5}
                 ior={1.5}
-                chromaticAberration={0.06}
-                anisotropy={0.1}
-                distortion={0.1}
-                distortionScale={0.3}
-                temporalDistortion={0.5}
+                chromaticAberration={0.1} // Increased for sci-fi look
+                anisotropy={0.2}
+                distortion={0.2}
+                distortionScale={0.4}
+                temporalDistortion={0.2}
                 clearcoat={1}
                 attenuationDistance={0.5}
                 attenuationColor="#ffffff"
-                color={isSelected ? "#e0f2fe" : "#ffffff"}
+                color={isSelected ? "#bfdbfe" : "#ffffff"}
+                toneMapped={true}
             />
          </mesh>
 
@@ -148,9 +203,15 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
             {memory.previewImage && <BubbleContent url={memory.previewImage} />}
          </Suspense>
          
-         {/* Selection Halo */}
+         {/* Selection Halo - Emissive for Bloom */}
          {isSelected && (
-            <pointLight distance={4} intensity={2} color="#3b82f6" decay={2} />
+            <mesh scale={1.1}>
+                 <sphereGeometry args={[1, 32, 32]} />
+                 <meshBasicMaterial color="#60a5fa" transparent opacity={0.15} side={THREE.BackSide} />
+            </mesh>
+         )}
+         {isSelected && (
+            <pointLight distance={6} intensity={4} color="#3b82f6" decay={2} />
          )}
       </group>
     </Float>
@@ -171,8 +232,7 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
         const x = Math.cos(theta) * radius;
         const z = Math.sin(theta) * radius;
 
-        const spread = 22; // Slightly wider spread
-        // Deterministic offset based on index to keep layout stable but organic
+        const spread = 22; 
         const randomOffset = 0.8 + (Math.sin(i * 123) * 0.5 + 0.5) * 0.4;
         
         pos.push([
@@ -182,16 +242,20 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
         ]);
     }
     return pos;
-  }, [memories.length]); // Only recalc if count changes
+  }, [memories.length]); 
 
   return (
     <>
+      <color attach="background" args={['#e8e9eb']} />
+      
+      {/* Lights */}
       <ambientLight intensity={1.5} />
       <directionalLight position={[10, 20, 10]} intensity={2.5} castShadow />
       <directionalLight position={[-10, -10, -10]} intensity={1} color="#bfdbfe" />
       <spotLight position={[0, 50, 0]} intensity={1.5} angle={0.5} penumbra={1} />
       
-      {/* City preset gives good reflections for glass */}
+      {/* Data Environment */}
+      <DataParticles />
       <Environment preset="city" />
       
       <group>
@@ -207,6 +271,18 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
         ))}
       </group>
 
+      {/* Post Processing Pipeline */}
+      <EffectComposer disableNormalPass>
+        <Bloom 
+            luminanceThreshold={1.1} // Only very bright things glow
+            mipmapBlur 
+            intensity={0.6} 
+            radius={0.6} 
+        />
+        <Vignette eskil={false} offset={0.1} darkness={0.5} />
+        <Noise opacity={0.02} />
+      </EffectComposer>
+
       <OrbitControls 
         enablePan={true} 
         enableZoom={true} 
@@ -216,11 +292,10 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
         minDistance={5}
         maxDistance={120}
         rotateSpeed={0.6}
-        autoRotate={!selectedId} // Auto rotate when idle adds to the "Live" feel
+        autoRotate={!selectedId}
         autoRotateSpeed={0.5}
       />
       
-      {/* Downscale pixel density on move for performance */}
       <AdaptiveDpr pixelated />
     </>
   );
@@ -231,17 +306,16 @@ const BubbleGraph: React.FC<BubbleGraphProps> = (props) => {
     <div className="w-full h-full">
       <Canvas 
         camera={{ position: [0, 0, 50], fov: 35, near: 0.1, far: 1000 }} 
-        dpr={[1, 1.5]} // Cap DPR at 1.5 for performance on high-res screens
+        dpr={[1, 1.5]} 
         gl={{ 
             powerPreference: "high-performance",
-            antialias: true,
+            antialias: false, // Disabled because EffectComposer handles AA or we accept aliasing for perf
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.2,
             alpha: true,
             stencil: false,
             depth: true
         }}
-        performance={{ min: 0.5 }} // Allow downgrading quality on slow devices
       >
         <Suspense fallback={null}>
            <BubblesScene {...props} />
