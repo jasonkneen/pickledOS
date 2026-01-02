@@ -1,15 +1,17 @@
 
 import React, { useMemo, useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Float, useCursor, useTexture, AdaptiveDpr, MeshTransmissionMaterial } from '@react-three/drei';
+import { OrbitControls, Environment, Float, useCursor, useTexture, AdaptiveDpr, Billboard } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { Memory } from '../types';
+import { VisualSettings } from './SettingsPanel';
 
 interface BubbleGraphProps {
   memories: Memory[];
   onSelectMemory: (memory: Memory) => void;
   selectedId: string | null;
+  settings: VisualSettings;
 }
 
 interface BubbleNodeProps {
@@ -17,15 +19,15 @@ interface BubbleNodeProps {
   isSelected: boolean;
   onSelect: (m: Memory) => void;
   position: [number, number, number];
+  settings: VisualSettings;
 }
 
-// Reusable geometry to reduce GPU memory overhead
-const bubbleGeometry = new THREE.SphereGeometry(1, 32, 32);
-const innerGeometry = new THREE.SphereGeometry(0.98, 32, 32);
+const bubbleGeometry = new THREE.SphereGeometry(1, 24, 24);
+const imageGeometry = new THREE.CircleGeometry(0.85, 24); 
 
 // GPU Particle System for Data Ambience
-const DataParticles = () => {
-  const count = 2000;
+const DataParticles = ({ opacity }: { opacity: number }) => {
+  const count = 1500; 
   const mesh = useRef<THREE.Points>(null);
   
   const particles = useMemo(() => {
@@ -33,7 +35,7 @@ const DataParticles = () => {
     for (let i = 0; i < count; i++) {
       const theta = THREE.MathUtils.randFloatSpread(360); 
       const phi = THREE.MathUtils.randFloatSpread(360); 
-      const r = 50 + Math.random() * 100;
+      const r = 40 + Math.random() * 80;
       
       const x = r * Math.sin(theta) * Math.cos(phi);
       const y = r * Math.sin(theta) * Math.sin(phi);
@@ -48,8 +50,7 @@ const DataParticles = () => {
 
   useFrame((state, delta) => {
      if (mesh.current) {
-         mesh.current.rotation.y += delta * 0.05;
-         mesh.current.rotation.x += delta * 0.02;
+         mesh.current.rotation.y += delta * 0.04;
      }
   });
 
@@ -65,9 +66,9 @@ const DataParticles = () => {
       </bufferGeometry>
       <pointsMaterial 
         size={0.4} 
-        color="#93c5fd" 
+        color="#60a5fa" 
         transparent 
-        opacity={0.6} 
+        opacity={opacity} 
         sizeAttenuation={true} 
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -79,38 +80,36 @@ const DataParticles = () => {
 
 const BubbleContent = ({ url }: { url: string }) => {
   const texture = useTexture(url);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1, 1);
+  texture.center.set(0.5, 0.5);
   texture.colorSpace = THREE.SRGBColorSpace;
   
   return (
-    <mesh geometry={innerGeometry}>
-      <meshStandardMaterial 
-        map={texture} 
-        roughness={0.2}
-        metalness={0.1}
-        envMapIntensity={1.5}
-      />
-    </mesh>
+    <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+      <mesh geometry={imageGeometry}>
+        <meshBasicMaterial 
+          map={texture} 
+          transparent
+          opacity={1} 
+          side={THREE.DoubleSide}
+          toneMapped={false} 
+        />
+      </mesh>
+    </Billboard>
   );
 };
 
-// Optimized Connections using single Draw Call (lineSegments)
-const Connections = ({ memories, positions }: { memories: Memory[], positions: [number, number, number][] }) => {
+const Connections = ({ memories, positions, opacity }: { memories: Memory[], positions: [number, number, number][], opacity: number }) => {
     const geometry = useMemo(() => {
         if (!memories.length || !positions.length) return new THREE.BufferGeometry();
 
         const points: number[] = [];
         const posMap = new Map<string, [number, number, number]>();
         
-        // Fast lookup
         memories.forEach((mem, i) => posMap.set(mem.id, positions[i]));
 
         memories.forEach((mem, i) => {
             if (mem.relatedIds && mem.relatedIds.length > 0) {
                 const startPos = positions[i];
-                // Safety check
                 if (!startPos) return;
 
                 mem.relatedIds.forEach(targetId => {
@@ -129,7 +128,7 @@ const Connections = ({ memories, positions }: { memories: Memory[], positions: [
 
     return (
         <lineSegments geometry={geometry}>
-            <lineBasicMaterial color="#94a3b8" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
+            <lineBasicMaterial color="#cbd5e1" transparent opacity={opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
         </lineSegments>
     );
 };
@@ -138,7 +137,8 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
   memory, 
   isSelected, 
   onSelect, 
-  position 
+  position,
+  settings
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
@@ -146,12 +146,9 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
 
   useFrame((state, delta) => {
     if (groupRef.current) {
-      // Smooth lerp for scale interactions
-      const targetScale = isSelected ? 1.6 : (hovered ? 1.3 : 1.0);
+      const targetScale = isSelected ? 1.5 : (hovered ? 1.2 : 1.0);
       groupRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), delta * 8);
-      
-      // Idle animation
-      groupRef.current.rotation.y += delta * 0.15;
+      groupRef.current.rotation.y += delta * 0.2;
     }
   });
 
@@ -171,55 +168,56 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
         onPointerOver={() => setHover(true)}
         onPointerOut={() => setHover(false)}
       >
-         {/* Premium Glass Shell using MeshTransmissionMaterial */}
+         {/* Glass Shell */}
          <mesh geometry={bubbleGeometry}>
-            <MeshTransmissionMaterial 
-                backside={false}
-                samples={4} // GPU Friendly
-                resolution={512} 
-                transmission={1}
-                roughness={0.05}
-                thickness={1.5}
-                ior={1.5}
-                chromaticAberration={0.1} // Increased for sci-fi look
-                anisotropy={0.2}
-                distortion={0.2}
-                distortionScale={0.4}
-                temporalDistortion={0.2}
-                clearcoat={1}
-                attenuationDistance={0.5}
-                attenuationColor="#ffffff"
+            <meshPhysicalMaterial 
                 color={isSelected ? "#bfdbfe" : "#ffffff"}
-                toneMapped={true}
+                transmission={settings.glassTransmission} 
+                opacity={settings.glassOpacity} 
+                metalness={0.1}
+                roughness={settings.glassRoughness}
+                ior={1.4}
+                thickness={settings.glassThickness}
+                specularIntensity={1}
+                envMapIntensity={2}
+                clearcoat={1}
+                transparent={true}
+                side={THREE.FrontSide}
             />
          </mesh>
 
-         {/* Inner Content - Textured Sphere */}
+         {/* Inner Content */}
          <Suspense fallback={
-            <mesh geometry={innerGeometry}>
-              <meshStandardMaterial color="#f1f5f9" roughness={0.8} />
+            <mesh scale={0.5}>
+              <sphereGeometry args={[0.5, 12, 12]} />
+              <meshBasicMaterial color="#e2e8f0" transparent opacity={0.3} />
             </mesh>
          }>
             {memory.previewImage && <BubbleContent url={memory.previewImage} />}
          </Suspense>
          
-         {/* Selection Halo - Emissive for Bloom */}
+         {/* Selection Glow */}
          {isSelected && (
-            <mesh scale={1.1}>
-                 <sphereGeometry args={[1, 32, 32]} />
-                 <meshBasicMaterial color="#60a5fa" transparent opacity={0.15} side={THREE.BackSide} />
-            </mesh>
-         )}
-         {isSelected && (
-            <pointLight distance={6} intensity={4} color="#3b82f6" decay={2} />
+            <group>
+                <mesh scale={1.05}>
+                     <sphereGeometry args={[1, 24, 24]} />
+                     <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} depthWrite={false} toneMapped={false} />
+                </mesh>
+                
+                <mesh scale={1.2}>
+                     <sphereGeometry args={[1, 24, 24]} />
+                     <meshBasicMaterial color="#60a5fa" transparent opacity={0.1} depthWrite={false} toneMapped={false} />
+                </mesh>
+
+                <pointLight distance={10} intensity={10} color="#3b82f6" decay={2} />
+            </group>
          )}
       </group>
     </Float>
   );
 };
 
-const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps) => {
-  // Pre-calculate positions (Fibonacci Sphere algorithm for even distribution)
+const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: BubbleGraphProps) => {
   const positions = useMemo(() => {
     const pos: [number, number, number][] = [];
     const phi = Math.PI * (3 - Math.sqrt(5)); 
@@ -246,20 +244,19 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
 
   return (
     <>
-      <color attach="background" args={['#e8e9eb']} />
+      <color attach="background" args={['#f1f5f9']} />
       
       {/* Lights */}
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[10, 20, 10]} intensity={2.5} castShadow />
-      <directionalLight position={[-10, -10, -10]} intensity={1} color="#bfdbfe" />
-      <spotLight position={[0, 50, 0]} intensity={1.5} angle={0.5} penumbra={1} />
+      <ambientLight intensity={settings.ambientLightIntensity} />
+      <directionalLight position={[10, 20, 10]} intensity={settings.directionalLightIntensity} castShadow />
+      <directionalLight position={[-10, -10, -10]} intensity={settings.directionalLightIntensity * 0.3} color="#93c5fd" />
+      <spotLight position={[0, 50, 0]} intensity={1} angle={0.5} penumbra={1} />
       
-      {/* Data Environment */}
-      <DataParticles />
+      <DataParticles opacity={settings.particleOpacity} />
       <Environment preset="city" />
       
       <group>
-        <Connections memories={memories} positions={positions} />
+        <Connections memories={memories} positions={positions} opacity={settings.connectionOpacity} />
         {memories.map((mem, i) => (
           <BubbleNode 
             key={mem.id}
@@ -267,20 +264,20 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId }: BubbleGraphProps
             isSelected={selectedId === mem.id}
             onSelect={onSelectMemory}
             position={positions[i]}
+            settings={settings}
           />
         ))}
       </group>
 
-      {/* Post Processing Pipeline */}
-      <EffectComposer disableNormalPass>
+      <EffectComposer disableNormalPass multisampling={0}>
         <Bloom 
-            luminanceThreshold={1.1} // Only very bright things glow
+            luminanceThreshold={settings.bloomThreshold}
             mipmapBlur 
-            intensity={0.6} 
-            radius={0.6} 
+            intensity={settings.bloomIntensity}
+            radius={settings.bloomRadius}
         />
-        <Vignette eskil={false} offset={0.1} darkness={0.5} />
-        <Noise opacity={0.02} />
+        <Vignette eskil={false} offset={0} darkness={0.5} />
+        <Noise opacity={0.015} />
       </EffectComposer>
 
       <OrbitControls 
@@ -309,9 +306,9 @@ const BubbleGraph: React.FC<BubbleGraphProps> = (props) => {
         dpr={[1, 1.5]} 
         gl={{ 
             powerPreference: "high-performance",
-            antialias: false, // Disabled because EffectComposer handles AA or we accept aliasing for perf
+            antialias: false,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 1.2,
+            toneMappingExposure: 0.9,
             alpha: true,
             stencil: false,
             depth: true

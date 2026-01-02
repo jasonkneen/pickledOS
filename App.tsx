@@ -6,14 +6,19 @@ import BubbleGraph from './components/BubbleGraph';
 import IntegrationsModal from './components/IntegrationsModal';
 import MemorySidebar from './components/MemorySidebar';
 import ChatPanel from './components/ChatPanel';
+import SettingsPanel, { VisualSettings, DEFAULT_SETTINGS } from './components/SettingsPanel';
 import { Settings, Plus, LayoutGrid, Disc, Target, Image as ImageIcon } from 'lucide-react';
 
 const App: React.FC = () => {
   const [showIntegrations, setShowIntegrations] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState<Integration[]>(MOCK_INTEGRATIONS);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   
+  // Visual Settings State
+  const [visualSettings, setVisualSettings] = useState<VisualSettings>(DEFAULT_SETTINGS);
+
   // Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatContext, setChatContext] = useState<{count: number} | null>(null);
@@ -103,39 +108,27 @@ const App: React.FC = () => {
 
   return (
     <div 
-        className="w-full h-screen bg-[#e8e9eb] p-6 flex overflow-hidden relative selection:bg-blue-100 selection:text-blue-900 gap-6"
+        className="w-full h-screen bg-[#f1f5f9] relative overflow-hidden selection:bg-blue-100 selection:text-blue-900"
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleGlobalDrop}
     >
       
-      {/* LEFT: Slide-out Chat Panel */}
-      <div 
-        className={`absolute left-6 top-6 bottom-6 z-40 transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) ${isChatOpen ? 'translate-x-0' : '-translate-x-[calc(100%+24px)]'}`}
-      >
-          <ChatPanel 
-            onAddMemory={handleAddMemory}
-            selectedMemory={selectedMemory}
-            initialContext={chatContext}
-            externalDroppedFile={droppedFile}
-            onClose={() => setIsChatOpen(false)}
-          />
-      </div>
-
-      {/* CENTER: Canvas */}
-      <div className="flex-1 relative rounded-[32px] overflow-hidden z-10">
+      {/* BACKGROUND: Full Screen Canvas */}
+      <div className="absolute inset-0 z-0">
          <BubbleGraph 
             memories={memories} 
             selectedId={selectedMemory?.id || null}
             onSelectMemory={(mem) => {
                 setSelectedMemory(mem);
             }} 
+            settings={visualSettings}
          />
          
          {/* Empty State / Welcome */}
          {memories.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="bg-white/50 backdrop-blur-md p-8 rounded-3xl text-center max-w-md pointer-events-auto shadow-xl">
+                <div className="bg-white/50 backdrop-blur-md p-8 rounded-3xl text-center max-w-md pointer-events-auto shadow-xl border border-white/50">
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Pickle</h2>
                     <p className="text-gray-600 mb-6">Your memory graph is empty. Connect a service or drop an image to start.</p>
                     <button 
@@ -150,12 +143,27 @@ const App: React.FC = () => {
          
          {/* Drag Overlay Indicator */}
          {isDragging && (
-            <div className="absolute inset-0 bg-blue-50/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-blue-600 animate-in fade-in duration-200 rounded-[32px] border-4 border-blue-400 border-dashed m-4">
-                <ImageIcon size={64} className="mb-6 animate-bounce" />
-                <p className="font-semibold text-2xl">Drop image to create Memory</p>
-                <p className="text-lg opacity-70 mt-2">Pickle will extract EXIF data & visual context</p>
+            <div className="absolute inset-0 bg-blue-50/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-blue-600 animate-in fade-in duration-200">
+                <div className="border-4 border-blue-400 border-dashed p-12 rounded-[32px] flex flex-col items-center animate-bounce">
+                    <ImageIcon size={64} className="mb-6" />
+                    <p className="font-semibold text-2xl">Drop image to create Memory</p>
+                    <p className="text-lg opacity-70 mt-2">Pickle will extract EXIF data & visual context</p>
+                </div>
             </div>
          )}
+      </div>
+
+      {/* LEFT: Slide-out Chat Panel */}
+      <div 
+        className={`absolute left-6 top-6 bottom-6 z-40 transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) ${isChatOpen ? 'translate-x-0' : '-translate-x-[calc(100%+24px)]'}`}
+      >
+          <ChatPanel 
+            onAddMemory={handleAddMemory}
+            selectedMemory={selectedMemory}
+            initialContext={chatContext}
+            externalDroppedFile={droppedFile}
+            onClose={() => setIsChatOpen(false)}
+          />
       </div>
 
       {/* CONTROLS: Floating Bar */}
@@ -190,12 +198,30 @@ const App: React.FC = () => {
             </button>
          </div>
 
-         <div className="glass-panel p-2 rounded-2xl shadow-sm flex flex-col gap-2 mt-auto bg-white/90 backdrop-blur-md border border-white/50">
-             <button className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-black/5 text-gray-500 transition-colors" title="Settings">
+         <div className="glass-panel p-2 rounded-2xl shadow-sm flex flex-col gap-2 mt-auto bg-white/90 backdrop-blur-md border border-white/50 relative">
+             <button 
+                onClick={() => setShowSettings(!showSettings)}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors ${showSettings ? 'bg-blue-100 text-blue-600' : 'hover:bg-black/5 text-gray-500'}`}
+                title="Settings"
+            >
                 <Settings size={20} />
             </button>
          </div>
       </div>
+      
+      {/* Settings Overlay */}
+      {showSettings && (
+          <div 
+            className="fixed top-6 z-30 transition-all duration-300"
+            style={{ right: selectedMemory ? '580px' : '84px' }}
+          >
+              <SettingsPanel 
+                settings={visualSettings}
+                onUpdate={setVisualSettings}
+                onClose={() => setShowSettings(false)}
+              />
+          </div>
+      )}
 
       {/* RIGHT: Memory Detail Panel */}
       <div 
