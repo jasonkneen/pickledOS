@@ -238,8 +238,6 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
 };
 
 const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: BubbleGraphProps) => {
-  const controlsRef = useRef<any>(null);
-  
   const positions = useMemo(() => {
     const pos: [number, number, number][] = [];
     const phi = Math.PI * (3 - Math.sqrt(5)); 
@@ -263,21 +261,6 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
     }
     return pos;
   }, [memories.length]); 
-
-  // Calculate target position for camera orbit
-  const targetPosition = useMemo(() => {
-    if (!selectedId) return new THREE.Vector3(0, 0, 0);
-    const index = memories.findIndex(m => m.id === selectedId);
-    if (index === -1) return new THREE.Vector3(0, 0, 0);
-    return new THREE.Vector3(...positions[index]);
-  }, [selectedId, memories, positions]);
-
-  // Smoothly move orbit target
-  useFrame((state, delta) => {
-    if (controlsRef.current) {
-        controlsRef.current.target.lerp(targetPosition, 4 * delta);
-    }
-  });
 
   return (
     <>
@@ -324,7 +307,6 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
       </EffectComposer>
 
       <OrbitControls 
-        ref={controlsRef}
         enablePan={true} 
         enableZoom={true} 
         enableRotate={true}
@@ -335,6 +317,7 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
         rotateSpeed={0.6}
         autoRotate={!selectedId}
         autoRotateSpeed={0.5}
+        target={[0, 0, 0]}
       />
       
       <AdaptiveDpr pixelated />
