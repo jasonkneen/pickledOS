@@ -2,7 +2,7 @@
 import React, { useMemo, useRef, useState, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, Float, useCursor, useTexture, AdaptiveDpr, Billboard } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, Vignette, Noise, BrightnessContrast, HueSaturation } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { Memory } from '../types';
 import { VisualSettings } from './SettingsPanel';
@@ -22,10 +22,10 @@ interface BubbleNodeProps {
   settings: VisualSettings;
 }
 
-const bubbleGeometry = new THREE.SphereGeometry(1, 24, 24);
-const imageGeometry = new THREE.CircleGeometry(0.85, 24); 
+const bubbleGeometry = new THREE.SphereGeometry(1, 48, 48); 
+const imageGeometry = new THREE.CircleGeometry(0.85, 32); 
 
-// GPU Particle System for Data Ambience
+// GPU Particle System
 const DataParticles = ({ opacity }: { opacity: number }) => {
   const count = 1500; 
   const mesh = useRef<THREE.Points>(null);
@@ -65,13 +65,12 @@ const DataParticles = ({ opacity }: { opacity: number }) => {
         />
       </bufferGeometry>
       <pointsMaterial 
-        size={0.4} 
-        color="#60a5fa" 
+        size={0.6}
+        color="#94a3b8" 
         transparent 
         opacity={opacity} 
         sizeAttenuation={true} 
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
       />
     </points>
   );
@@ -128,7 +127,7 @@ const Connections = ({ memories, positions, opacity }: { memories: Memory[], pos
 
     return (
         <lineSegments geometry={geometry}>
-            <lineBasicMaterial color="#cbd5e1" transparent opacity={opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
+            <lineBasicMaterial color="#64748b" transparent opacity={opacity} depthWrite={false} />
         </lineSegments>
     );
 };
@@ -171,17 +170,18 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
          {/* Glass Shell */}
          <mesh geometry={bubbleGeometry}>
             <meshPhysicalMaterial 
-                color={isSelected ? "#bfdbfe" : "#ffffff"}
+                color={isSelected ? "#bfdbfe" : "#cbd5e1"} 
                 transmission={settings.glassTransmission} 
                 opacity={settings.glassOpacity} 
-                metalness={0.1}
+                metalness={0.2}
                 roughness={settings.glassRoughness}
-                ior={1.4}
+                ior={1.5}
                 thickness={settings.glassThickness}
                 specularIntensity={1}
-                envMapIntensity={2}
+                envMapIntensity={1} 
                 clearcoat={1}
-                transparent={true}
+                clearcoatRoughness={0.1}
+                transparent={true} 
                 side={THREE.FrontSide}
             />
          </mesh>
@@ -190,27 +190,29 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
          <Suspense fallback={
             <mesh scale={0.5}>
               <sphereGeometry args={[0.5, 12, 12]} />
-              <meshBasicMaterial color="#e2e8f0" transparent opacity={0.3} />
+              <meshBasicMaterial color="#94a3b8" transparent opacity={0.5} />
             </mesh>
          }>
             {memory.previewImage && <BubbleContent url={memory.previewImage} />}
          </Suspense>
          
-         {/* Selection Glow */}
+         {/* Selection / Hover Highlight */}
+         {(isSelected || hovered) && (
+            <mesh scale={1.05}>
+                <sphereGeometry args={[1, 24, 24]} />
+                <meshBasicMaterial 
+                    color="#3b82f6" 
+                    transparent 
+                    opacity={isSelected ? 0.2 : 0.1} 
+                    depthWrite={false} 
+                    toneMapped={false}
+                    side={THREE.BackSide} 
+                />
+            </mesh>
+         )}
+         
          {isSelected && (
-            <group>
-                <mesh scale={1.05}>
-                     <sphereGeometry args={[1, 24, 24]} />
-                     <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} depthWrite={false} toneMapped={false} />
-                </mesh>
-                
-                <mesh scale={1.2}>
-                     <sphereGeometry args={[1, 24, 24]} />
-                     <meshBasicMaterial color="#60a5fa" transparent opacity={0.1} depthWrite={false} toneMapped={false} />
-                </mesh>
-
-                <pointLight distance={10} intensity={10} color="#3b82f6" decay={2} />
-            </group>
+            <pointLight distance={8} intensity={5} color="#3b82f6" decay={2} />
          )}
       </group>
     </Float>
@@ -246,14 +248,13 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
     <>
       <color attach="background" args={['#f1f5f9']} />
       
-      {/* Lights */}
       <ambientLight intensity={settings.ambientLightIntensity} />
       <directionalLight position={[10, 20, 10]} intensity={settings.directionalLightIntensity} castShadow />
-      <directionalLight position={[-10, -10, -10]} intensity={settings.directionalLightIntensity * 0.3} color="#93c5fd" />
-      <spotLight position={[0, 50, 0]} intensity={1} angle={0.5} penumbra={1} />
+      <directionalLight position={[-10, 0, -10]} intensity={settings.directionalLightIntensity * 0.5} color="#94a3b8" />
+      <directionalLight position={[0, -10, 5]} intensity={0.5} color="#cbd5e1" />
       
       <DataParticles opacity={settings.particleOpacity} />
-      <Environment preset="city" />
+      <Environment preset="city" background={false} />
       
       <group>
         <Connections memories={memories} positions={positions} opacity={settings.connectionOpacity} />
@@ -270,14 +271,21 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
       </group>
 
       <EffectComposer disableNormalPass multisampling={0}>
+        <BrightnessContrast 
+          brightness={settings.brightness} 
+          contrast={settings.contrast} 
+        />
+        <HueSaturation 
+          saturation={settings.saturation} 
+          hue={0} 
+        />
         <Bloom 
             luminanceThreshold={settings.bloomThreshold}
             mipmapBlur 
             intensity={settings.bloomIntensity}
             radius={settings.bloomRadius}
         />
-        <Vignette eskil={false} offset={0} darkness={0.5} />
-        <Noise opacity={0.015} />
+        <Vignette eskil={false} offset={0.1} darkness={0.4} />
       </EffectComposer>
 
       <OrbitControls 
@@ -306,9 +314,9 @@ const BubbleGraph: React.FC<BubbleGraphProps> = (props) => {
         dpr={[1, 1.5]} 
         gl={{ 
             powerPreference: "high-performance",
-            antialias: false,
+            antialias: true,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: 0.9,
+            toneMappingExposure: 1.2, 
             alpha: true,
             stencil: false,
             depth: true

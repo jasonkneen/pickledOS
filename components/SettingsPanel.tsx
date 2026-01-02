@@ -5,29 +5,45 @@ import { X, Sliders } from 'lucide-react';
 export interface VisualSettings {
   ambientLightIntensity: number;
   directionalLightIntensity: number;
+  // Post Processing
   bloomIntensity: number;
   bloomRadius: number;
   bloomThreshold: number;
+  // Color Correction
+  contrast: number;
+  brightness: number;
+  saturation: number;
+  // Material
   glassOpacity: number;
   glassRoughness: number;
   glassTransmission: number;
   glassThickness: number;
+  // Scene
   particleOpacity: number;
   connectionOpacity: number;
 }
 
 export const DEFAULT_SETTINGS: VisualSettings = {
-  ambientLightIntensity: 0.8,
-  directionalLightIntensity: 1.5,
-  bloomIntensity: 1.5,
-  bloomRadius: 0.4,
-  bloomThreshold: 1.1,
-  glassOpacity: 0.3,
-  glassRoughness: 0.05,
-  glassTransmission: 0.98,
-  glassThickness: 0.5,
-  particleOpacity: 0.5,
-  connectionOpacity: 0.2,
+  // User specified defaults
+  ambientLightIntensity: 0.20,
+  directionalLightIntensity: 0.40,
+  
+  bloomIntensity: 0.50,
+  bloomRadius: 0.90,
+  bloomThreshold: 1.50,
+
+  // New settings defaults
+  contrast: 0.1,    // Slight boost
+  brightness: 0.0,
+  saturation: 0.0,  // Neutral
+
+  glassOpacity: 0.95,
+  glassRoughness: 0.00,
+  glassTransmission: 0.74,
+  glassThickness: 1.70,
+
+  particleOpacity: 0.20,
+  connectionOpacity: 0.15,
 };
 
 interface SettingsPanelProps {
@@ -60,7 +76,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClo
   );
 
   return (
-    <div className="w-80 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col h-full max-h-[70vh]">
+    <div className="w-80 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden flex flex-col h-full max-h-[80vh]">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white/50">
         <div className="flex items-center gap-2 font-semibold text-gray-800">
           <Sliders size={18} />
@@ -74,15 +90,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClo
       <div className="p-5 overflow-y-auto flex-1 scrollbar-hide">
         <div className="mb-6">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Lighting</h3>
-          <Slider label="Ambient Intensity" settingKey="ambientLightIntensity" value={settings.ambientLightIntensity} min={0} max={3} step={0.1} />
-          <Slider label="Directional Intensity" settingKey="directionalLightIntensity" value={settings.directionalLightIntensity} min={0} max={5} step={0.1} />
+          <Slider label="Ambient Intensity" settingKey="ambientLightIntensity" value={settings.ambientLightIntensity} min={0} max={2} step={0.05} />
+          <Slider label="Directional Intensity" settingKey="directionalLightIntensity" value={settings.directionalLightIntensity} min={0} max={3} step={0.05} />
         </div>
 
         <div className="mb-6">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Post Processing</h3>
-          <Slider label="Bloom Intensity" settingKey="bloomIntensity" value={settings.bloomIntensity} min={0} max={4} step={0.1} />
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Color & Bloom</h3>
+          <Slider label="Bloom Intensity" settingKey="bloomIntensity" value={settings.bloomIntensity} min={0} max={3} step={0.1} />
           <Slider label="Bloom Radius" settingKey="bloomRadius" value={settings.bloomRadius} min={0} max={1.5} step={0.1} />
           <Slider label="Bloom Threshold" settingKey="bloomThreshold" value={settings.bloomThreshold} min={0} max={2} step={0.1} />
+          <div className="h-px bg-gray-100 my-4"></div>
+          <Slider label="Contrast" settingKey="contrast" value={settings.contrast} min={-1} max={1} step={0.05} />
+          <Slider label="Brightness" settingKey="brightness" value={settings.brightness} min={-1} max={1} step={0.05} />
+          <Slider label="Saturation" settingKey="saturation" value={settings.saturation} min={-1} max={1} step={0.05} />
         </div>
 
         <div className="mb-6">
@@ -95,7 +115,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, onClo
 
         <div>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Scene</h3>
-          <Slider label="Particle Opacity" settingKey="particleOpacity" value={settings.particleOpacity} min={0} max={1} step={0.1} />
+          <Slider label="Particle Opacity" settingKey="particleOpacity" value={settings.particleOpacity} min={0} max={1} step={0.05} />
           <Slider label="Connection Opacity" settingKey="connectionOpacity" value={settings.connectionOpacity} min={0} max={1} step={0.05} />
         </div>
       </div>
