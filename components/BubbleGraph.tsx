@@ -23,7 +23,8 @@ interface BubbleNodeProps {
 }
 
 const bubbleGeometry = new THREE.SphereGeometry(1, 48, 48); 
-const imageGeometry = new THREE.CircleGeometry(0.85, 32); 
+const imageGeometry = new THREE.CircleGeometry(0.88, 32); 
+const ringGeometry = new THREE.RingGeometry(0.85, 0.92, 32);
 
 // GPU Particle System
 const DataParticles = ({ opacity }: { opacity: number }) => {
@@ -77,22 +78,31 @@ const DataParticles = ({ opacity }: { opacity: number }) => {
 };
 
 
-const BubbleContent = ({ url }: { url: string }) => {
+const BubbleContent = ({ url, isSelected }: { url: string, isSelected: boolean }) => {
   const texture = useTexture(url);
   texture.center.set(0.5, 0.5);
   texture.colorSpace = THREE.SRGBColorSpace;
   
   return (
     <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-      <mesh geometry={imageGeometry}>
-        <meshBasicMaterial 
-          map={texture} 
-          transparent
-          opacity={1} 
-          side={THREE.DoubleSide}
-          toneMapped={false} 
-        />
-      </mesh>
+      <group renderOrder={1}>
+        {/* The Photo Itself */}
+        <mesh geometry={imageGeometry}>
+          <meshBasicMaterial 
+            map={texture} 
+            transparent={false} // Solid photo
+            opacity={1}
+            side={THREE.DoubleSide}
+            toneMapped={false} // Keep colors vibrant/true regardless of exposure
+            color="white"
+          />
+        </mesh>
+        
+        {/* A white ring border to frame the photo */}
+        <mesh geometry={ringGeometry} position={[0, 0, 0.01]}>
+             <meshBasicMaterial color={isSelected ? "#3b82f6" : "white"} side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+      </group>
     </Billboard>
   );
 };
@@ -170,7 +180,7 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
          {/* Glass Shell */}
          <mesh geometry={bubbleGeometry}>
             <meshPhysicalMaterial 
-                color={isSelected ? "#bfdbfe" : "#cbd5e1"} 
+                color={isSelected ? "#bfdbfe" : "#ffffff"} 
                 transmission={settings.glassTransmission} 
                 opacity={settings.glassOpacity} 
                 metalness={0.2}
@@ -178,25 +188,27 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
                 ior={1.5}
                 thickness={settings.glassThickness}
                 specularIntensity={1}
-                envMapIntensity={1} 
+                envMapIntensity={1.5} 
                 clearcoat={1}
-                clearcoatRoughness={0.1}
+                clearcoatRoughness={0.05}
                 transparent={true} 
                 side={THREE.FrontSide}
+                attenuationColor="#ffffff"
+                attenuationDistance={1}
             />
          </mesh>
 
-         {/* Inner Content */}
+         {/* Inner Content - The Photo */}
          <Suspense fallback={
             <mesh scale={0.5}>
               <sphereGeometry args={[0.5, 12, 12]} />
-              <meshBasicMaterial color="#94a3b8" transparent opacity={0.5} />
+              <meshBasicMaterial color="#cbd5e1" wireframe />
             </mesh>
          }>
-            {memory.previewImage && <BubbleContent url={memory.previewImage} />}
+            {memory.previewImage && <BubbleContent url={memory.previewImage} isSelected={isSelected} />}
          </Suspense>
          
-         {/* Selection / Hover Highlight */}
+         {/* Selection / Hover Glow */}
          {(isSelected || hovered) && (
             <mesh scale={1.05}>
                 <sphereGeometry args={[1, 24, 24]} />
@@ -212,7 +224,7 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
          )}
          
          {isSelected && (
-            <pointLight distance={8} intensity={5} color="#3b82f6" decay={2} />
+            <pointLight distance={6} intensity={3} color="#3b82f6" decay={2} />
          )}
       </group>
     </Float>

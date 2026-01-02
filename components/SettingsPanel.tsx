@@ -24,7 +24,7 @@ export interface VisualSettings {
 }
 
 export const DEFAULT_SETTINGS: VisualSettings = {
-  // User specified defaults
+  // User specified defaults from screenshot
   ambientLightIntensity: 0.20,
   directionalLightIntensity: 0.40,
   
@@ -32,12 +32,12 @@ export const DEFAULT_SETTINGS: VisualSettings = {
   bloomRadius: 0.90,
   bloomThreshold: 1.50,
 
-  // New settings defaults
-  contrast: 0.1,    // Slight boost
-  brightness: 0.0,
-  saturation: 0.0,  // Neutral
+  // Color correction defaults (Added to make scene pop)
+  contrast: 0.15,    
+  brightness: 0.05,
+  saturation: 0.10,
 
-  glassOpacity: 0.95,
+  glassOpacity: 0.95, // High opacity as requested
   glassRoughness: 0.00,
   glassTransmission: 0.74,
   glassThickness: 1.70,
