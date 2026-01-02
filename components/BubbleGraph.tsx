@@ -1,5 +1,5 @@
 
-import React, { useMemo, useRef, useState, Suspense } from 'react';
+import React, { useMemo, useRef, useState, Suspense, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, Float, useCursor, useTexture, AdaptiveDpr, Billboard } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, Noise, BrightnessContrast, HueSaturation } from '@react-three/postprocessing';
@@ -78,7 +78,7 @@ const DataParticles = ({ opacity }: { opacity: number }) => {
 };
 
 
-const BubbleContent = ({ url, isSelected }: { url: string, isSelected: boolean }) => {
+const BubbleContent: React.FC<{ url: string; isSelected: boolean }> = ({ url, isSelected }) => {
   const texture = useTexture(url);
   texture.center.set(0.5, 0.5);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -163,9 +163,9 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
 
   return (
     <Float 
-      speed={2} 
-      rotationIntensity={0.2} 
-      floatIntensity={0.5} 
+      speed={isSelected ? 0 : 2} // Stop floating when selected so rotation center is stable
+      rotationIntensity={isSelected ? 0 : 0.2} 
+      floatIntensity={isSelected ? 0 : 0.5} 
       position={position}
     >
       <group 
@@ -205,7 +205,13 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
               <meshBasicMaterial color="#cbd5e1" wireframe />
             </mesh>
          }>
-            {memory.previewImage && <BubbleContent url={memory.previewImage} isSelected={isSelected} />}
+            {memory.previewImage && (
+              <BubbleContent 
+                key={memory.previewImage} // Force unique instance per URL
+                url={memory.previewImage} 
+                isSelected={isSelected} 
+              />
+            )}
          </Suspense>
          
          {/* Selection / Hover Glow */}
@@ -232,6 +238,8 @@ const BubbleNode: React.FC<BubbleNodeProps> = ({
 };
 
 const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: BubbleGraphProps) => {
+  const controlsRef = useRef<any>(null);
+  
   const positions = useMemo(() => {
     const pos: [number, number, number][] = [];
     const phi = Math.PI * (3 - Math.sqrt(5)); 
@@ -255,6 +263,21 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
     }
     return pos;
   }, [memories.length]); 
+
+  // Calculate target position for camera orbit
+  const targetPosition = useMemo(() => {
+    if (!selectedId) return new THREE.Vector3(0, 0, 0);
+    const index = memories.findIndex(m => m.id === selectedId);
+    if (index === -1) return new THREE.Vector3(0, 0, 0);
+    return new THREE.Vector3(...positions[index]);
+  }, [selectedId, memories, positions]);
+
+  // Smoothly move orbit target
+  useFrame((state, delta) => {
+    if (controlsRef.current) {
+        controlsRef.current.target.lerp(targetPosition, 4 * delta);
+    }
+  });
 
   return (
     <>
@@ -301,6 +324,7 @@ const BubblesScene = ({ memories, onSelectMemory, selectedId, settings }: Bubble
       </EffectComposer>
 
       <OrbitControls 
+        ref={controlsRef}
         enablePan={true} 
         enableZoom={true} 
         enableRotate={true}

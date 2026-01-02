@@ -222,16 +222,16 @@ export const generateMemories = (datasetId: string = 'pickles'): Memory[] => {
     
     // Create a deterministic "random" image URL so it stays consistent across renders but differs per item
     // Using picsum with a seed based on dataset and index
-    const seed = `${datasetId}-${i}`; 
-    const isGray = datasetId === 'pickles'; // Style choice
-
+    const seed = `${datasetId}-${i}-${Math.random()}`; // Ensure uniqueness even if re-generated
+    
+    // Removed isGray logic to ensure all images are colorful and distinct
     memories.push({
       id: `${datasetId}-${i}`,
       title: fact.title,
       source: source,
       sourceId: datasetId,
       date: new Date(Date.now() - Math.floor(Math.random() * 5000000000)).toLocaleDateString(),
-      previewImage: `https://picsum.photos/seed/${seed}/300/300?${isGray ? 'grayscale' : ''}`, 
+      previewImage: `https://picsum.photos/seed/${seed}/300/300`, 
       content: fact.content,
       tags: [category, datasetId.charAt(0).toUpperCase() + datasetId.slice(1)],
       relatedIds: []
