@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import { Memory } from '../types';
-import { ChevronLeft, ChevronRight, X, ArrowUp, Globe, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Globe, Trash2, MessageCircle } from 'lucide-react';
 
 interface MemorySidebarProps {
   memory: Memory | null;
   allMemories: Memory[];
   onClose: () => void;
+  onOpenChat: () => void;
 }
 
-const MemorySidebar: React.FC<MemorySidebarProps> = ({ memory, allMemories, onClose }) => {
-  const [input, setInput] = useState('');
-
+const MemorySidebar: React.FC<MemorySidebarProps> = ({ memory, allMemories, onClose, onOpenChat }) => {
   if (!memory) return null;
 
   // Find linked memories from the full list
@@ -54,36 +53,22 @@ const MemorySidebar: React.FC<MemorySidebarProps> = ({ memory, allMemories, onCl
             {memory.date} · {memory.source.charAt(0).toUpperCase() + memory.source.slice(1)}
         </div>
 
-        {/* Section: Hypothesis */}
+        {/* Section: Hypothesis/Analysis */}
         <div className="mb-8">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">2 hypothesis</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Analysis</h3>
             <div className="space-y-4">
-                <p className="text-sm text-gray-500 leading-relaxed">
-                    It might also be that you'd rather build a small, very devoted cult around Pickle—like a quiet luxury brand—than chase broad but shallow mainstream appeal.
+                 <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                    {memory.content}
                 </p>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                    Maybe you want Pickle to feel like a calm inner companion for long-term self-work, so you keep making the brand quiet and anti-dopamine instead of loud and attention-grabbing.
+                   This memory seems to be related to {memory.tags.join(', ')}. Connecting it to other nodes creates a cluster of similar knowledge.
                 </p>
             </div>
         </div>
 
-        {/* Input Area (Inline) */}
-        <div className="relative mb-10">
-            <input 
-                type="text" 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Add reply to create new understanding..."
-                className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-1 focus:ring-gray-200 transition-all"
-            />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-white hover:bg-gray-300 transition-colors">
-                <ArrowUp size={16} />
-            </button>
-        </div>
-
         {/* Section: Linked */}
-        <div>
-            <div className="flex items-center gap-2 mb-4">
+        <div className="mt-auto">
+            <div className="flex items-center gap-2 mb-4 pt-4 border-t border-gray-100">
                 <span className="text-sm font-semibold text-gray-900">Linked</span>
                 <span className="text-sm text-gray-400">{displayLinked.length}</span>
             </div>
@@ -118,7 +103,13 @@ const MemorySidebar: React.FC<MemorySidebarProps> = ({ memory, allMemories, onCl
 
       {/* Footer Actions */}
       <div className="p-4 flex justify-between items-center border-t border-gray-50 bg-white">
-         <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors text-sm font-medium">@</button>
+         <button 
+            onClick={onOpenChat}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+            title="Chat with Context"
+         >
+             <span className="text-lg">@</span>
+         </button>
          <div className="flex gap-2">
             <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors"><Trash2 size={18} /></button>
             <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors"><Globe size={18} /></button>

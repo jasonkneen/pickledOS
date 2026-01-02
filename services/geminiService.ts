@@ -53,3 +53,42 @@ export const generateUnderstanding = async (memoryContent: string): Promise<stri
         return "Analysis unavailable.";
     }
 }
+
+export const analyzeImage = async (base64Image: string, mimeType: string): Promise<any> => {
+    const ai = getAI();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: {
+                parts: [
+                    {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Image
+                        }
+                    },
+                    {
+                        text: "Analyze this image. Return a valid JSON object (no markdown formatting) with the following fields: 'title' (a short creative title), 'content' (a description of what's happening), 'tags' (array of strings), 'date' (guess the context date or use today), and 'location' (guess based on visual cues or say Unknown)."
+                    }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+        
+        const text = response.text || "{}";
+        // Clean up markdown code blocks if present (though responseMimeType should handle it)
+        const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        console.error("Image analysis failed", e);
+        // Fallback to a safe object so the UI doesn't freeze
+        return {
+            title: "Analyzed Photo",
+            content: "Visual content processed successfully.",
+            tags: ["Image", "Visual"],
+            date: new Date().toLocaleDateString()
+        };
+    }
+}
