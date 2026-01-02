@@ -1,0 +1,5 @@
+{
+  "name": "Pickle Memory OS",
+  "description": "A privacy-first memory operating system that aggregates your digital footprint into a visual knowledge graph, powered by Gemini.",
+  "requestFramePermissions": []
+}
